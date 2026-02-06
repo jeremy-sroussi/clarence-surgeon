@@ -1,5 +1,5 @@
 {
-    "name": "surgeon-voice-agent",
+    "name": "clarence-surgeon",
     "version": "1.0.0",
     "private": true,
     "scripts": {
@@ -20,6 +20,7 @@
         "react-dom": "^19.2.4"
     },
     "devDependencies": {
+        "@prisma/client-runtime-utils": "7.3.0",
         "@tailwindcss/postcss": "^4.1.18",
         "@types/node": "^25.2.0",
         "@types/pg": "^8.16.0",
