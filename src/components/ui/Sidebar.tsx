@@ -1,11 +1,22 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
+import { useAuth } from '@/components/providers/AuthProvider';
 
 export function Sidebar({ onCreateClick }: { onCreateClick?: () => void }) {
     const pathname = usePathname();
+    const router = useRouter();
+    const { user } = useAuth();
     const isAgentsActive = pathname?.startsWith('/agents');
+
+    const handleSignOut = async () => {
+        const supabase = createClient();
+        await supabase.auth.signOut();
+        router.push('/login');
+        router.refresh();
+    };
 
     return (
         <aside className="w-[240px] h-full flex flex-col border-r border-border bg-bg-secondary/50">
@@ -51,6 +62,26 @@ export function Sidebar({ onCreateClick }: { onCreateClick?: () => void }) {
                     </button>
                 </div>
             )}
+
+            {/* Sign out */}
+            <div className="px-3 pb-4 border-t border-border pt-3">
+                {user && (
+                    <p className="text-[10px] text-text-secondary truncate px-1 mb-2">{user.email}</p>
+                )}
+                <button
+                    onClick={handleSignOut}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-bg-panel transition-colors cursor-pointer"
+                >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3-3h-9m9 0l-3-3m3 3l-3 3"
+                        />
+                    </svg>
+                    Sign Out
+                </button>
+            </div>
         </aside>
     );
 }

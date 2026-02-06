@@ -1,4 +1,5 @@
 import { client } from '@/lib/claude';
+import { createClient } from '@/lib/supabase/server';
 import { V2_SYSTEM_PROMPT, buildV2Messages } from '@/lib/prompts-v1';
 import type { ClarificationQuestion, ConsultationPolicy, PolicyChallenge, Reflection, V2AnalysisResponse } from '@/lib/types';
 
@@ -13,6 +14,20 @@ interface RequestBody {
 }
 
 export async function POST(req: Request) {
+    // Verify authentication
+    const supabase = await createClient();
+    const {
+        data: { user },
+        error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' },
+        });
+    }
+
     const body = (await req.json()) as RequestBody;
     const { userMessage, currentPolicy, conversationHistory, isOnboarding } = body;
 

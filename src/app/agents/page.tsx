@@ -8,7 +8,7 @@ import { CreateAgentModal } from '@/components/agents/CreateAgentModal';
 
 export default function AgentsPage() {
     const router = useRouter();
-    const { agents, createAgent, archiveAgent, deleteAgent } = useAgents();
+    const { agents, loading, createAgent, archiveAgent, deleteAgent } = useAgents();
     const [showCreate, setShowCreate] = useState(false);
 
     // Listen for sidebar "Create Agent" button event
@@ -19,8 +19,8 @@ export default function AgentsPage() {
     }, []);
 
     const handleCreate = useCallback(
-        (name: string, specialty?: string) => {
-            const agent = createAgent(name, specialty);
+        async (name: string, specialty?: string) => {
+            const agent = await createAgent(name, specialty);
             router.push(`/agents/${agent.id}`);
         },
         [createAgent, router]
@@ -46,7 +46,13 @@ export default function AgentsPage() {
                 </button>
             </div>
 
-            <AgentList agents={agents} onArchive={archiveAgent} onDelete={deleteAgent} />
+            {loading ? (
+                <div className="flex items-center justify-center py-20">
+                    <div className="w-6 h-6 border-2 border-accent-blue/30 border-t-accent-blue rounded-full animate-spin" />
+                </div>
+            ) : (
+                <AgentList agents={agents} onArchive={archiveAgent} onDelete={deleteAgent} />
+            )}
 
             <CreateAgentModal open={showCreate} onClose={() => setShowCreate(false)} onCreate={handleCreate} />
         </div>

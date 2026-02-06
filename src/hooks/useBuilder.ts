@@ -10,7 +10,6 @@ import type {
     Reflection,
     V2AnalysisResponse,
 } from '@/lib/types';
-import { loadAgent, saveAgent } from '@/lib/storage';
 
 // ── Onboarding Questions ──
 
@@ -109,12 +108,10 @@ function builderReducer(state: BuilderState, action: BuilderAction): BuilderStat
 
 // ── Hook ──
 
-export function useBuilder(agentId: string) {
-    const agent = loadAgent(agentId);
-
+export function useBuilder(agent: Agent) {
     // Determine onboarding state from saved data
-    const hasHistory = agent && agent.conversationHistory.length > 0;
-    const onboardingComplete = agent?.onboardingComplete ?? false;
+    const hasHistory = agent.conversationHistory.length > 0;
+    const onboardingComplete = agent.onboardingComplete;
 
     // Build initial messages: if fresh agent, inject first onboarding question
     const initialMessages: BuilderMessage[] = hasHistory
@@ -139,7 +136,7 @@ export function useBuilder(agentId: string) {
         status: 'idle',
         processingContext: 'analyzing',
         messages: initialMessages,
-        policy: agent?.policy ?? null,
+        policy: agent.policy ?? null,
         onboardingStep: initialOnboardingStep,
         showPolicyDrawer: false,
         interimText: '',
@@ -149,23 +146,55 @@ export function useBuilder(agentId: string) {
     const [state, dispatch] = useReducer(builderReducer, initialState);
     const stateRef = useRef(state);
     const processingRef = useRef(false);
+    const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         stateRef.current = state;
     }, [state]);
 
-    // Persist to localStorage after state changes
+    // Debounced persistence to Supabase via API
     useEffect(() => {
-        if (!agent) return;
-        const updated: Agent = {
-            ...agent,
-            updatedAt: Date.now(),
-            policy: state.policy,
-            conversationHistory: state.messages,
-            onboardingComplete: state.onboardingStep === 'complete',
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+        }
+
+        saveTimeoutRef.current = setTimeout(() => {
+            fetch(`/api/agents/${agent.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    policy: stateRef.current.policy,
+                    conversationHistory: stateRef.current.messages,
+                    onboardingComplete: stateRef.current.onboardingStep === 'complete',
+                }),
+            }).catch((err) => console.error('Failed to persist agent:', err));
+        }, 1500);
+
+        return () => {
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current);
+            }
         };
-        saveAgent(updated);
-    }, [state.policy, state.messages, state.onboardingStep]);
+    }, [state.policy, state.messages, state.onboardingStep, agent.id]);
+
+    // Flush pending save on unmount
+    useEffect(() => {
+        return () => {
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current);
+                // Fire-and-forget final save
+                fetch(`/api/agents/${agent.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        policy: stateRef.current.policy,
+                        conversationHistory: stateRef.current.messages,
+                        onboardingComplete: stateRef.current.onboardingStep === 'complete',
+                    }),
+                }).catch(() => {});
+            }
+        };
+    }, [agent.id]);
 
     // Bundle onboarding answers into a single message for the API
     const bundleOnboardingAnswers = useCallback((): string => {
@@ -205,7 +234,7 @@ export function useBuilder(agentId: string) {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        agentId,
+                        agentId: agent.id,
                         userMessage,
                         currentPolicy: currentState.policy,
                         conversationHistory: conversationForApi,
@@ -278,7 +307,7 @@ export function useBuilder(agentId: string) {
                 processingRef.current = false;
             }
         },
-        [agentId]
+        [agent.id]
     );
 
     const sendMessage = useCallback(
@@ -366,7 +395,5 @@ export function useBuilder(agentId: string) {
         dispatch,
         sendMessage,
         answerClarification,
-        agentName: agent?.name ?? 'Unknown Agent',
-        agentSpecialty: agent?.specialty,
     };
 }

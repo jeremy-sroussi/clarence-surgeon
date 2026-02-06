@@ -2,47 +2,45 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { Agent } from '@/lib/types';
-import { loadAgents, saveAgents, deleteAgent as removeAgent } from '@/lib/storage';
 
 export function useAgents() {
     const [agents, setAgents] = useState<Agent[]>([]);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        setAgents(loadAgents());
+        fetch('/api/agents')
+            .then((res) => res.json())
+            .then((data: Agent[]) => setAgents(data))
+            .catch((err) => console.error('Failed to load agents:', err))
+            .finally(() => setLoading(false));
     }, []);
 
-    const createAgent = useCallback((name: string, specialty?: string): Agent => {
-        const agent: Agent = {
-            id: crypto.randomUUID(),
-            name,
-            specialty,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-            status: 'active',
-            policy: null,
-            conversationHistory: [],
-            onboardingComplete: false,
-        };
-        setAgents((prev) => {
-            const next = [...prev, agent];
-            saveAgents(next);
-            return next;
+    const createAgent = useCallback(async (name: string, specialty?: string): Promise<Agent> => {
+        const res = await fetch('/api/agents', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, specialty }),
         });
+        const agent = (await res.json()) as Agent;
+        setAgents((prev) => [agent, ...prev]);
         return agent;
     }, []);
 
-    const archiveAgent = useCallback((id: string) => {
-        setAgents((prev) => {
-            const next = prev.map((a) => (a.id === id ? { ...a, status: 'archived' as const, updatedAt: Date.now() } : a));
-            saveAgents(next);
-            return next;
+    const archiveAgent = useCallback(async (id: string) => {
+        await fetch(`/api/agents/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'archived' }),
         });
+        setAgents((prev) =>
+            prev.map((a) => (a.id === id ? { ...a, status: 'archived' as const, updatedAt: Date.now() } : a))
+        );
     }, []);
 
-    const deleteAgent = useCallback((id: string) => {
-        removeAgent(id);
+    const deleteAgent = useCallback(async (id: string) => {
+        await fetch(`/api/agents/${id}`, { method: 'DELETE' });
         setAgents((prev) => prev.filter((a) => a.id !== id));
     }, []);
 
-    return { agents, createAgent, archiveAgent, deleteAgent };
+    return { agents, loading, createAgent, archiveAgent, deleteAgent };
 }
