@@ -15,7 +15,7 @@ Requires `ANTHROPIC_API_KEY` in `.env` (see `.env.example`). The Anthropic SDK r
 
 ## Code Style
 
-Prettier config: 4-space indent, single quotes, 120 print width, trailing commas (es5), always parens on arrows. Path alias: `@/*` maps to `./src/*`.
+4-space indent, single quotes. Path alias: `@/*` maps to `./src/*`. TypeScript strict mode with `noUncheckedIndexedAccess: true` — indexed access returns `T | undefined`, so always narrow or assert after bracket access.
 
 ## Tech Stack
 
@@ -47,11 +47,12 @@ Speech input (French, Web Speech API) → `useSpeechRecognition` hook → user p
 - **`src/lib/prompts-v1.ts`** — System prompt and message builder. Defines the consultation policy structure (4 blocks: highPotentialPatients, lowPotentialPatients, inBetween, forNonQualified) and 3 dimensions (scope, readiness, urgency). Claude outputs `---JSON---` then a `V2AnalysisResponse` JSON object. Uses prompt caching for the system prompt.
 - **`src/lib/types.ts`** — All TypeScript types: `Agent`, `ConsultationPolicy`, `PolicyBlock`, `PolicyRule`, `BuilderMessage`, `BuilderState`, `BuilderAction`, `V2AnalysisResponse`.
 - **`src/lib/storage.ts`** — localStorage persistence for agents (key: `surgeon-logic-agents`).
-- **`src/app/api/analyze/route.ts`** — SSE streaming endpoint with prompt caching (`cache_control: ephemeral`). Streams `progress` events during generation, then parses final JSON after `---JSON---` delimiter and sends a `result` event.
+- **`src/lib/claude.ts`** — Anthropic SDK client singleton.
+- **`src/app/api/analyze/route.ts`** — SSE streaming endpoint with prompt caching (`cache_control: ephemeral`). Streams `thinking` events (pre-delimiter text) and a `status` event, then parses final JSON after `---JSON---` delimiter and sends a `result` event.
 
 ### Component Structure
 
-- `builder/` — BuilderHeader, BuilderConversation, MessageBubble, DictationZone, ReflectionBlock, ChallengeBlock, ClarificationChips, PolicyDrawer, PolicyBlockView
+- `builder/` — BuilderHeader, BuilderConversation, MessageBubble, DictationZone, ClarificationChips, PolicyPanel, PolicyBlockView
 - `agents/` — AgentList, AgentCard, CreateAgentModal
 - `ui/` — Sidebar, Drawer, Modal
 
