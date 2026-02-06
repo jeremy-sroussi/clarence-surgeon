@@ -14,8 +14,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Environment
 
 Requires these variables in `.env` (see `.env.example`):
+
 - `ANTHROPIC_API_KEY` — Anthropic SDK reads it automatically
-- `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Supabase Auth (browser + server)
+- `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — Supabase Auth (browser + server)
 - `DATABASE_URL` — Supabase pooled connection (port 6543, `?pgbouncer=true`) for Prisma runtime
 - `DIRECT_URL` — Supabase direct connection (port 5432) for Prisma migrations
 
