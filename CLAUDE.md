@@ -89,3 +89,68 @@ Client hooks (`useAgents`, `useBuilder`) call REST API routes (`/api/agents`, `/
 ### Onboarding Flow
 
 New agents go through 4 questions (steps 0-3). During steps 0-2, user answers are stored locally without API calls. On step 3, all 4 answers are bundled into a single message and sent to the API with `isOnboarding: true`. After that, normal conversational policy refinement begins.
+
+## Important Implementation Notes
+
+### Prisma 7 Configuration
+
+Prisma 7 changed how connection URLs work:
+- **CLI commands** (migrate, generate, etc.) read `datasource.url` from `prisma/prisma.config.ts`
+- **Runtime** (PrismaClient) requires a **driver adapter** (`@prisma/adapter-pg`) passed to the constructor
+- The schema file (`prisma/schema.prisma`) no longer contains `url` or `directUrl` — only `provider = "postgresql"`
+- Runtime connection string comes from `DATABASE_URL` env var via the adapter
+- Migration connection string comes from `DIRECT_URL` env var via `prisma.config.ts`
+
+### Supabase + Prisma Connection Strings
+
+Supabase provides two connection modes:
+- **Transaction pooler** (port 6543) with `?pgbouncer=true` — use for runtime queries (`DATABASE_URL`)
+- **Session pooler** (port 5432) — use for migrations (`DIRECT_URL`)
+
+### Type Casting for JSONB
+
+Prisma's `Json` type doesn't directly match TypeScript types like `BuilderMessage[]` or `ConsultationPolicy`. Use `as unknown as` for safe casting:
+```typescript
+policy: row.policy as unknown as Agent['policy'],
+conversationHistory: row.conversationHistory as unknown as Agent['conversationHistory'],
+```
+
+When updating JSONB fields, handle `null` explicitly:
+```typescript
+if (data.policy !== undefined) {
+    updateData.policy = data.policy === null
+        ? Prisma.JsonNull
+        : (data.policy as unknown as Prisma.InputJsonValue);
+}
+```
+
+### Supabase Auth with @supabase/ssr
+
+- Use `createBrowserClient` for client components (handles cookies automatically)
+- Use `createServerClient` for server components/API routes (requires cookie helpers with `await cookies()`)
+- Middleware client refreshes tokens on every request and redirects based on auth state
+- API routes should verify auth via `supabase.auth.getUser()` — don't trust client-side session
+
+### Debounced Persistence Pattern
+
+The `useBuilder` hook debounces saves to avoid excessive DB writes during rapid state changes (e.g., speech input):
+```typescript
+const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+useEffect(() => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+
+    saveTimeoutRef.current = setTimeout(() => {
+        fetch(`/api/agents/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ policy, conversationHistory, onboardingComplete })
+        });
+    }, 1500);
+
+    return () => {
+        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+}, [policy, conversationHistory, onboardingComplete]);
+```
+
+This batches rapid changes into a single DB write 1.5 seconds after the last change.
