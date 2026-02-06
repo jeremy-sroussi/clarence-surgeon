@@ -1,4 +1,3 @@
-import { Prisma } from '@prisma/client';
 import { prisma } from './prisma';
 import type { Agent } from './types';
 import type { Agent as PrismaAgent } from '@prisma/client';
@@ -69,10 +68,12 @@ export async function updateAgent(
     if (data.status !== undefined) updateData.status = data.status;
     if (data.onboardingComplete !== undefined) updateData.onboardingComplete = data.onboardingComplete;
     if (data.policy !== undefined) {
-        updateData.policy = data.policy === null ? Prisma.JsonNull : (data.policy as unknown as Prisma.InputJsonValue);
+        // Store policy JSON as-is when provided
+        updateData.policy = data.policy;
     }
     if (data.conversationHistory !== undefined) {
-        updateData.conversationHistory = data.conversationHistory as unknown as Prisma.InputJsonValue;
+        // Store conversation history JSON as-is when provided
+        updateData.conversationHistory = data.conversationHistory;
     }
 
     await prisma.agent.updateMany({
